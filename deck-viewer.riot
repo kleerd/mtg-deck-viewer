@@ -1,0 +1,89 @@
+<deck-viewer>
+  <div class="field">
+    <div class="control">
+      <textarea class="textarea" placeholder="1 Yarok, the Desecrated"></textarea>
+    </div>
+  </div>
+  <div class="field is-grouped">
+    <div class="control">
+      <button class="button is-primary" type="button" onclick="{ show }">Show</button>
+    </div>
+    <div class="control">
+      <button class="button">Clear</button>
+    </div>
+  </div>  
+  <div class="columns is-multiline">
+    <div class="column is-one-quarter-desktop is-half-tablet" each="{ card in state.deck }">
+      <nav class="level">
+        <div class="level-item has-text-centered">
+          <div>
+            <p class="heading">{ card.name } ({ card.count })</p>
+            <p>
+              <img src="{ card.params.imageUrl }" alt="{ card.name }" if={ card.params }>
+              <span if={ !card.params }>Loading...</span>
+            </p>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </div>
+  <script>
+    function parse(texts) {
+      deck = [];
+      const cards = texts.split(/\n/);
+      cards.forEach((card, index, _) => {
+        const i = card.indexOf(' ');
+        if (i > 0) {
+          const c = {"count": card.slice(0, i), "name": card.slice(i + 1)};
+          deck.push(c);
+        }
+      });
+      return deck;
+    }
+    function cardQuery(cardName) {
+      const name = cardName.split('/')[0];
+      return "https://api.magicthegathering.io/v1/cards?contains=imageUrl&name=" + encodeURIComponent(name);
+    }
+    function createCardParams(cards, lang) {
+      var first = cards[0];
+      const found = first.foreignNames.find(f => f.language == lang);
+      if (found) {
+        first.name = found.name;
+        first.imageUrl = found.imageUrl;
+      }
+      return first;
+    }
+    export default {
+      onBeforeMount(state, props) {
+        this.props = {
+        };
+        this.state = {
+          deck: [],
+        };
+      },
+      show(e) {
+        this.state.deck = parse(this.$('textarea').value);
+        this.update({
+          'deck': this.state.deck,
+        });
+        this.state.deck.forEach((card, index, _) => {
+          if (!card.params) {
+            fetch(cardQuery(card.name))
+            .then(response => response.json())
+            .then(json => {
+              const sorted = json.cards.sort(function (a, b) {
+                if (!a.multiverseid) return 1;
+                if (!b.multiverseid) return -1;
+                return (a.multiverseid < b.multiverseid) ? 1 : -1;
+              });
+              card.params = createCardParams(sorted, "Japanese");
+              this.update({
+                'deck': this.state.deck,
+              });
+            });
+          }
+        });
+      }
+    }
+  </script>
+</deck-viewer>
